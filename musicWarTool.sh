@@ -111,37 +111,62 @@ convert_music_file() {
 # Raises:
 #   Exit: If the music directory does not exist.
 cleanup() {
+    local remove_ogg_gz=false
+    if [ "$1" = "-f" ]; then
+        remove_ogg_gz=true
+    fi
     shopt -s nullglob
     if [ ! -d "$musicDir" ]; then
         echo "Error: $musicDir does not exist!"
         exit 1
     fi
-    rm -f "$musicDir"/*.{wav,ogg,ogg.gz}
+    rm -f "$musicDir"/*.{wav,ogg}
+    if $remove_ogg_gz; then
+        rm -f "$musicDir"/*.ogg.gz
+    fi
     shopt -u nullglob
 }
 
-while getopts ":mc" opt; do
-    case $opt in
+usage() {
+    echo "Usage: $0 [-m|-c [full]]"
+    echo "-m: convert midi files to wav and compress to ogg.gz"
+    echo "-c: cleanup non-midi files in music directory"
+    echo "       -c norm: standard cleanup"
+    echo "       -c full: also remove ogg.gz files"
+    
+    echo ""
+    echo ""
+    echo "Note: If WAR1GUS_PATH is not set, the current directory will be used."
+    exit 1
+}
+
+check_prerequisites
+
+while getopts ":c:hm" opt; do
+    case "${opt}" in
+        c)
+            echo "Cleanup non-midi files in music directory"
+
+            cleanup_opts=()
+            if [[ "$OPTARG" == *"full"* ]]; then
+                cleanup_opts+=(-f)
+            fi
+            cleanup "${cleanup_opts[@]}"
+            write_config_value ".mid"
+        ;;
+        h)
+            usage
+            exit 1
+        ;;
         m)
-            check_prerequisites
+            echo "Converting midi files to wav and compress to ogg.gz"
             for file in "$musicDir"/*.mid; do
                 convert_music_file "$file"
             done
             write_config_value ".ogg"
         ;;
-        c)
-            check_prerequisites
-            cleanup
-            write_config_value ".mid"
-        ;;
         \?)
-            echo "Usage: $0 [-m] [-c]"
-            echo "-m: Convert midi files to wav and compress to ogg.gz"
-            echo "-c: Cleanup wav and ogg files"
-            echo ""
-            echo ""
-            echo "Note: If WAR1GUS_PATH is not set, the current directory will be used."
-            exit 1
+            usage
         ;;
     esac
 done
